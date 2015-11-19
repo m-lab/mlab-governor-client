@@ -25,12 +25,12 @@ Users are interested in testing several different locations
 
 ####Server
 
-*MongoDB 
-*Static IP or hostname accessible to clients
+* MongoDB 
+* Static IP or hostname accessible to clients
 
 ####Clients
 
-*Internet connection
+* Internet connection
 
 ##Process
 To quickly begin creating performance data for your own network follow the steps below: 
