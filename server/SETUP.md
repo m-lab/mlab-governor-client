@@ -50,7 +50,7 @@ By default the governor uses two collections: “devices” and “testIds”. A
 
 Device Schema
 
-```json
+```
 {
    deviceID : ‘1’, 
    groupID : ‘1’, 
@@ -60,7 +60,7 @@ Device Schema
 
 TestId Schema 
 
-```json
+```
 {
     deviceID : ‘1/1/1’, 
     testId: ‘91312284cca5bcb38a353ae8c8ec9d4d’
