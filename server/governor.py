@@ -21,7 +21,7 @@ re_scheduler = sched.scheduler(time.time, time.sleep)
 ####################################  Database Code #####################################################################
 
 client = MongoClient('localhost', 27017)
-db = client.ACPS
+db = client[config.get("Timing", "database_name")]
 device_collection = db.devices
 testID_collection= db.testIds
 

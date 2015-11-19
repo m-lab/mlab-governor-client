@@ -5,8 +5,9 @@ import sched, time, ConfigParser, subprocess, json, urllib2, socket, sys, random
 mySchedule= []
 governor = sched.scheduler(time.time, time.sleep)
 config = ConfigParser.RawConfigParser()
-clientPath= "/home/odroid/ACPS/"
-configFile= clientPath+"client.cfg"
+configFile= "client.cfg" 
+
+
 
 ############################################ Helpers   #############################################################
 
@@ -200,7 +201,8 @@ def send_testIDs():
    talk_to_server(new_message)
 
 
-config.read(configFile)  
+config.read(configFile) 
+clientPath= config.get("Addresses", "client_path")
 server_address=config.get("Addresses", "server_address")
 deviceID= config.get("Addresses", "deviceID")
 #clientID= "partnerID/groupID/deviceID"
