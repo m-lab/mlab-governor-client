@@ -203,7 +203,7 @@ def send_testIDs():
 
 
 config.read(configFile) 
-clientPath= config.get("Addresses", "client_path")
+#clientPath= config.get("Addresses", "client_path")
 server_address=config.get("Addresses", "server_address")
 deviceID= config.get("Addresses", "deviceID")
 #clientID= "partnerID/groupID/deviceID"
