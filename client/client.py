@@ -5,7 +5,8 @@ import sched, time, ConfigParser, subprocess, json, urllib2, socket, sys, random
 mySchedule= []
 governor = sched.scheduler(time.time, time.sleep)
 config = ConfigParser.RawConfigParser()
-configFile= "client.cfg" 
+clientPath= "/home/odroid/ACPS/"
+configFile= clientPath+"client.cfg" 
 
 
 
