@@ -41,7 +41,7 @@ class Device:
    def setSchedule(self, scheduled): 
       """
       Args: 
-         scheduled: (list) of runs_per_day time_struct objects representing testing times.
+         scheduled: (list of string) representing testing times.
       """
       self.scheduled_runs= scheduled 
    
@@ -71,10 +71,10 @@ def seconds_to_time(seconds_float):
 def schedule_runs(): 
    """Function to schedule the runs for one day.
    Returns: 
-      (string) runtimes in the form: HMS/HMS/HMS/HMS
+      (list of string) runtimes in the form: [HMS, HMS, HMS, HMS]
    """
    global runs_per_day
-   schedule=""
+   schedule=[]
    last_scheduled= (0,0,0)
    second_tally= random.expovariate(float(runs_per_day)/86400) 
   
@@ -89,7 +89,7 @@ def schedule_runs():
             new_time[i]= "0" + elm
 
       start_time= new_time[0]+new_time[1]+ new_time[2]
-      schedule+= start_time +'/'
+      schedule.append(start_time)
       last_scheduled= (int(new_time[0]), int(new_time[1]), int(new_time[2]))
 
       second_tally+= random.expovariate(float(runs_per_day)/86400)
@@ -130,31 +130,51 @@ def refresh():
 
    schedule_refresh()
 
+def create_JSON_message(message_type, clientID, body=None): 
+   """Function to create a JSON object to send to the server. 
+
+   Args: 
+      type: (string) 'testId' | 'schedule' | 'failed' | 'ack'
+      clientID: (string) clientID
+      body: (optional) if the type is testId, then body is a list of 
+      string testId's
+
+
+   Returns: 
+      (JSON) JSON encoded message 
+
+   {
+      deviceID: deviceID, 
+      
+      : groupdID, 
+      partnerID: partnerID, 
+      type: testId | ack | fail | schedule
+      body: [testId_string, testId_string]
+   }
+
+   """
+   message= {"clientID" : clientID, "type" : message_type, "body" : body}
+   return json.dumps(message)
+
 
 ###############################  Serve  ##############################################################
 
-def save_testIDs(ids): 
+def save_testIDs(message): 
    """Function to save a client reported testIDS 
 
    Args: 
-      ids: (string) of test IDs of form TESTSIDS\nclientID\ndate\nid1\nid2
+      ids: (list) of testId's
    Returns: 
       (Boolean) False if there's a problem saving id's
       (string) "ack", if id's are saved successfully
    """
-   idArray= ids.split('\n')
+   idArray= message["body"]
    
-   if idArray[1]=="TESTIDS": #makes sure its the right format      
-      clientid= idArray[0].split('/')
-      for testid in idArray: 
-         db.testID_collection.insert({ "deviceID": clientid, "testID": testid})
-      return "ack"
-   else: 
-      print "Request was not recognized."
-      print "Closing connection..."
-      return False
+   for testid in idArray: 
+      db.testID_collection.insert({ "deviceID": message["clientID"], "testID": testid})
+   return create_JSON_message("ack", message["clientID"])
 
-def schedule_request(client): 
+def schedule_request(client, clientID): 
    """Function to handle a client requesting a schedule.
 
    Args: 
@@ -165,48 +185,57 @@ def schedule_request(client):
    """
    schedule= schedule_runs()  
    client.setSchedule(schedule)
-   return schedule
+   return create_JSON_message('schedule', clientID, schedule)
 
-def handle_request(data):
+def handle_request(message):
    """General function to handle all requests.
 
    Args: 
-      data: (string) data received from client
+      data: (dictionary) data received from client
    """  
-   dataArray= data.split("\n")
+   clientID= message["clientID"]
 
    try: 
-      device= devices[dataArray[0]]   #client "authentication"
+      device= devices[clientID]   #client "authentication"
    except KeyError: 
       print "ClientID was not recognized."
       print "Closing connection..."
       return False
-
-    #client is asking for a schedule
-   if len(dataArray)< 2: 
-      return schedule_request(device)
+   
+   #client is asking for a schedule
+   if message["type"]=="schedule": 
+      return schedule_request(device, message["clientID"])
    #client is reporting testIds
-   else: 
+   elif message["type"]=="testId": 
       return save_testIDs(data)
+   else: 
+      print "Request was not recognized."
+      print "Closing connection..."
+      return False
 
 
 def clientthread(connection, address):  
 
    data = connection.recv(1024) 
+   data = json.loads(data)
 
    print "Received message from client: " + str(data)
+   
 
    now= time.localtime()
    reply = handle_request(data)
 
-   print "Time: " + str(now.tm_hour)+":" + str(now.tm_minute)+ ":"+ str(now.tm_second)
+   print "Time: " + str(now.tm_hour)+":" + str(now.tm_min)+ ":"+ str(now.tm_sec)
    
    if reply:
       connection.sendall(reply)
-      print "Sent the following schedule: "+ reply +" to client: "+ str(data)
+      if "schedule" in reply: 
+         print "Sent the following schedule: "+ reply +" to client."
+      else: 
+         print "Responding with: "+ reply
 
    else: 
-      connection.sendall("Failed.")
+      connection.sendall(create_JSON_message("fail", "Unknown"))
       print "There was a problem processing client request."
       print "Closing connection..."
 
