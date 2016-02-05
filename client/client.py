@@ -33,6 +33,24 @@ def get_ndt_server():
    server = json.loads(mlabns)['fqdn'].encode('ascii')
    return server
 
+
+def ndt_success(ndt_output):
+   """Function that takes in NDT output and returns whether or not that run was 
+   successfully executed. 
+
+   Args: 
+      ndt_output: (string) 
+   
+   Returns: 
+      (Boolean) True if success, False otherwise
+
+   """
+   lower_output= ndt_output.lower()
+   if "fail" in lower_output or "done" not in lower_output: 
+      return False
+   return True
+
+
 def run_ndt ():
    """Function that runs ndt on the client. Creates a log file 'client.log'
    and appends to the testID log file for today.
@@ -42,18 +60,27 @@ def run_ndt ():
    ndt_server = get_ndt_server()
    ndt_testID= create_testID()
 
-   print "Client "+str(clientID)+": Running ndt test at "+ time.strftime("%x,%H:%M:%S")+ " with test Id: "+ ndt_testID
+   print "Client "+str(clientID)+": Running ndt test at "+ time.strftime("%x,%H:%M:%S") 
+   print "Test id: "+ ndt_testID
 
-   test_output = subprocess.Popen([clientPath+"web100clt", "-c", ndt_testID, "-n", ndt_server, "--disablesfw", "--disablemid"],stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+   #test_output = subprocess.Popen([clientPath+"web100clt", "-c", ndt_testID, "-n", ndt_server, "--disablesfw", "--disablemid"],stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+   
+   test_output = subprocess.Popen(["/Users/LavalleF/Documents/mlab-governor-client/client/web100clt", "-c", ndt_testID, "-n", ndt_server, "--disablesfw", "--disablemid"],stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
    log_data(ndt_testID)  #saves the testID to the log file
    log_text = test_output.communicate()
+
    logfile = open( clientPath+"client.log", 'a')
+   success_logfile = open( clientPath+"successful_testIds.log", 'a')
 
    logfile.write(time.strftime("\n-------\n%x,%H:%M:%S\n" + ndt_server + "\n"))
    for line in log_text[0].split('\n'):
       print line
       logfile.write(line + "\n")
+      if ndt_success(log_text): 
+         success_logfile.write(ndt_testID)
    logfile.close()
+   success_logfile.close()
 
 def schedule_one_task(start_time, function): 
    """Function that enters one test time into the scheduler. Checks to make 
@@ -96,13 +123,14 @@ def process_reply(string_schedule):
    return schedule
 
 def create_testID(): 
-   """Function to create a random 16 byte string 
+   """Function to create a random 8 byte string 
 
    Return: 
-      (string) 16 bytes of entropy
+      (string) 8 bytes of entropy
    """
-   proc = subprocess.Popen(["head -c 16 /dev/urandom |xxd -p"],stdout=subprocess.PIPE, shell=True)
-   return proc.communicate()[0]
+   proc = subprocess.Popen(["head -c 8 /dev/urandom |xxd -p"],stdout=subprocess.PIPE, shell=True)
+   test_id= proc.communicate()[0]
+   return test_id[0:16]
 
 def log_data(testID): 
    """Function to append data to today's log of testIDs. Data
@@ -269,7 +297,7 @@ if __name__ == '__main__':
       now= time.localtime()
       midnight= time.strptime(str(now.tm_mon)+"/"+str(now.tm_mday)+"/"+str(now.tm_year)+","+ "17,16,00",  '%m/%d/%Y,%H,%M,%S')
       if now>midnight: 
-         send_testIDs()
+         #send_testIDs()
 
 
 

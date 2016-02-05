@@ -70,6 +70,7 @@ dns-nameservers 10.5.0.10 10.5.0.20
 	```
 3. Enable it as a startup service.
 	```
+	$ sudo /etc/init.d/acps-service enable
 	$ sudo update-rc.d acps-service defaults
 	```
 
