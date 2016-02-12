@@ -5,7 +5,7 @@ import sched, time, ConfigParser, subprocess, json, urllib2, socket, sys, random
 mySchedule= []
 governor = sched.scheduler(time.time, time.sleep)
 config = ConfigParser.RawConfigParser()
-configPath= ""
+configPath= "/Users/LavalleF/Documents/mlab-governor-client/client/"
 configFile= "client.cfg" 
 
 
@@ -63,12 +63,12 @@ def run_ndt ():
    print "Client "+str(clientID)+": Running ndt test at "+ time.strftime("%x,%H:%M:%S") 
    print "Test id: "+ ndt_testID
 
-   #test_output = subprocess.Popen([clientPath+"web100clt", "-c", ndt_testID, "-n", ndt_server, "--disablesfw", "--disablemid"],stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-   
-   test_output = subprocess.Popen(["/Users/LavalleF/Documents/mlab-governor-client/client/web100clt", "-c", ndt_testID, "-n", ndt_server, "--disablesfw", "--disablemid"],stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+   web100path= configPath+"web100clt"
+   test_output = subprocess.Popen([ web100path, "-c", ndt_testID, "-n", ndt_server, "--disablesfw", "--disablemid"],stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
 
    log_data(ndt_testID)  #saves the testID to the log file
-   log_text = test_output.communicate()
+   log_text = test_output.communicate()[0]
 
    logfile = open( clientPath+"client.log", 'a')
    success_logfile = open( clientPath+"successful_testIds.log", 'a')
@@ -141,7 +141,7 @@ def log_data(testID):
       testID: (string) 
    """
    testlog = open( clientPath+"todays_testIDs.log", 'a')
-   testlog.write(testID)
+   testlog.write(testID+"\n")
    testlog.close()
 
 def start_new_testLog(): 
@@ -293,11 +293,11 @@ if __name__ == '__main__':
             governor.run()
 
      
-      #if almost midnight, send ids
-      now= time.localtime()
-      midnight= time.strptime(str(now.tm_mon)+"/"+str(now.tm_mday)+"/"+str(now.tm_year)+","+ "17,16,00",  '%m/%d/%Y,%H,%M,%S')
-      if now>midnight: 
-         #send_testIDs()
+      # #if almost midnight, send ids
+      # now= time.localtime()
+      # midnight= time.strptime(str(now.tm_mon)+"/"+str(now.tm_mday)+"/"+str(now.tm_year)+","+ "17,16,00",  '%m/%d/%Y,%H,%M,%S')
+      # if now>midnight: 
+      #    #send_testIDs()
 
 
 
