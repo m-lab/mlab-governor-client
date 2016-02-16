@@ -2,7 +2,7 @@
 answer=$(ps x |grep -v grep |grep -c "acps-service")
 if [ $answer -eq 0 ]
 then
-        echo "Starting acps-service again" >> /home/odroid/mlab-governor-client/client/acps-assurance.log
-        date >> /home/odroid/mlab-governor-client/client/acps-assurance.log
-        /home/odroid/mlab-governor-client/client/acps-service
+        echo "Starting acps-service again" >> /home/odroid/ACPS/mlab-governor-client/client/acps-assurance.log
+        date >> /home/odroid/ACPS/mlab-governor-client/client/acps-assurance.log
+        /home/odroid/ACPS/mlab-governor-client/client/acps-service
 fi

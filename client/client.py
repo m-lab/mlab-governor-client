@@ -5,7 +5,7 @@ import sched, time, ConfigParser, subprocess, json, urllib2, socket, sys, random
 mySchedule= []
 governor = sched.scheduler(time.time, time.sleep)
 config = ConfigParser.RawConfigParser()
-configPath= "/Users/LavalleF/Documents/mlab-governor-client/client/"
+configPath= "/home/odroid/ACPS/mlab-governor-client/client/"
 configFile= "client.cfg" 
 
 

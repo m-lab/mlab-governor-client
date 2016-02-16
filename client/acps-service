@@ -1,4 +1,4 @@
 #!/bin/sh
 sleep 10
-/usr/bin/python /Users/LavalleF/Documents/mlab-governor-client/client/client.py >> /Users/LavalleF/Documents/mlab-governor-client/client/client.log 2>&1
+/usr/bin/python /home/odroid/ACPS/mlab-governor-client/client/client.py >> /home/odroid/ACPS/mlab-governor-client/client/client.log 2>&1
 

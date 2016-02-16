@@ -61,15 +61,10 @@ def make_all_device_objects():
 	return all_devices 
 
 
-#all_devices= make_all_device_objects()
-#one= TestIdFile("8", "/Users/LavalleF/Documents/mlab-governor-client/test_ids/desk_odroid_test.log")
-one= TestIdFile("2", "/Users/LavalleF/Documents/mlab-governor-client/test_ids/right_side_ids.log")
-run_all_queries_one_device(one)
 
 
-
-
-
+all_devices= make_all_device_objects()
+run_all_queries_all_devices(all_devices)
 
 
 
