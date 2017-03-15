@@ -1,13 +1,24 @@
 #!/usr/bin/python
 
-import sched, time, ConfigParser, subprocess, json, urllib2, socket, sys, random, shutil
+import sched, time, ConfigParser, subprocess, json, urllib2, socket, sys, random, shutil, os
 
 mySchedule= []
 governor = sched.scheduler(time.time, time.sleep)
 config = ConfigParser.RawConfigParser()
-clientPath= "/home/odroid/ACPS/"
-configFile= clientPath+"client.cfg" 
+configPath= "/home/odroid/ACPS/mlab-governor-client/client/"
+configFile= "client.cfg" 
 
+
+###############################  Configuration   ####################################################################
+
+config.read(configPath+configFile) 
+clientPath= config.get("Addresses", "client_path")
+server_address=config.get("Addresses", "server_address")
+deviceID= config.get("Addresses", "deviceID")
+partnerID= config.get("Addresses", "partnerID")
+groupID= config.get("Addresses", "groupID")
+clientID= partnerID+"/"+groupID+"/"+deviceID
+port = 8888
 
 
 ############################################ Helpers   #############################################################
@@ -22,6 +33,24 @@ def get_ndt_server():
    server = json.loads(mlabns)['fqdn'].encode('ascii')
    return server
 
+
+def ndt_success(ndt_output):
+   """Function that takes in NDT output and returns whether or not that run was 
+   successfully executed. 
+
+   Args: 
+      ndt_output: (string) 
+   
+   Returns: 
+      (Boolean) True if success, False otherwise
+
+   """
+   lower_output= ndt_output.lower()
+   if "fail" in lower_output or "done" not in lower_output: 
+      return False
+   return True
+
+
 def run_ndt ():
    """Function that runs ndt on the client. Creates a log file 'client.log'
    and appends to the testID log file for today.
@@ -31,18 +60,27 @@ def run_ndt ():
    ndt_server = get_ndt_server()
    ndt_testID= create_testID()
 
-   print "Client "+str(clientID)+": Running ndt test at "+ time.strftime("%x,%H:%M:%S")+ " with test Id: "+ ndt_testID
+   print "Client "+str(clientID)+": Running ndt test at "+ time.strftime("%x,%H:%M:%S") 
+   print "Test id: "+ ndt_testID
 
-   test_output = subprocess.Popen([clientPath+"web100clt", "-c", ndt_testID, "-n", ndt_server, "--disablesfw", "--disablemid"],stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
+   web100path= configPath+"web100clt"
+   test_output = subprocess.Popen([ web100path, "-c", ndt_testID, "-n", ndt_server, "--disablesfw", "--disablemid"],stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+
    log_data(ndt_testID)  #saves the testID to the log file
-   log_text = test_output.communicate()
+   log_text = test_output.communicate()[0]
+
    logfile = open( clientPath+"client.log", 'a')
+   success_logfile = open( clientPath+"successful_testIds.log", 'a')
 
    logfile.write(time.strftime("\n-------\n%x,%H:%M:%S\n" + ndt_server + "\n"))
    for line in log_text[0].split('\n'):
       print line
       logfile.write(line + "\n")
+      if ndt_success(log_text): 
+         success_logfile.write(ndt_testID)
    logfile.close()
+   success_logfile.close()
 
 def schedule_one_task(start_time, function): 
    """Function that enters one test time into the scheduler. Checks to make 
@@ -67,32 +105,32 @@ def scheduleTests(schedule):
       schedule_one_task(task, run_ndt)
 
 def process_reply(string_schedule): 
-   """Function to process the string reply from the server 
-   containing the schedule. 
+   """Function to process the schedule from the server. Changes a list
+   of HMS format strings into a list of time_struct instances.
 
    Args: 
-      string_schedule: (string) 
+      string_schedule: (list of string) [HMS, HMS] schedule for server
 
    Returns: 
-      (list) of time_struct instances 
+      (list of time_struct instances) 
    """
-   list_schedule=  string_schedule.split('/')
    now= time.localtime()
    
    schedule= []
-   for start_time in list_schedule: 
+   for start_time in string_schedule: 
       schedule.append(time.strptime(str(now.tm_year) + "," + str(now.tm_yday) + "," + str(start_time[0:2])+":"+str(start_time[2:4])+":"+str(start_time[4:6]), '%Y,%j,%H:%M:%S'))
 
    return schedule
 
 def create_testID(): 
-   """Function to create a random 16 byte string 
+   """Function to create a random 8 byte string 
 
    Return: 
-      (string) 16 bytes of entropy
+      (string) 8 bytes of entropy
    """
-   proc = subprocess.Popen(["head -c 16 /dev/urandom |xxd -p"],stdout=subprocess.PIPE, shell=True)
-   return proc.communicate()[0]
+   proc = subprocess.Popen(["head -c 8 /dev/urandom |xxd -p"],stdout=subprocess.PIPE, shell=True)
+   test_id= proc.communicate()[0]
+   return test_id[0:16]
 
 def log_data(testID): 
    """Function to append data to today's log of testIDs. Data
@@ -111,28 +149,58 @@ def start_new_testLog():
    Only used after today and yesterday's logs have been sent to the governor server
    """
 
+   open(clientPath+"yesterdays_testIDs.log", 'w').close()
    shutil.copyfile(clientPath+"todays_testIDs.log", clientPath+"yesterdays_testIDs.log")
+   
    today= open(clientPath+"todays_testIDs.log", 'w')
-   today.write(time.strftime("%d/%m/%Y")+'\n')
+   today.write(time.strftime("%m/%d/%Y")+"\n")
    today.close()
+
+
+
+def create_JSON_message(message_type, body=None): 
+   """Function to create a JSON object to send to the server. 
+
+   Args: 
+      type: (string) 'testId' | 'schedule' | 'failed' | 'ack'
+      body: (optional) if the type is testId, then body is a list of 
+      string testId's
+
+   Returns: 
+      (JSON) JSON encoded message 
+
+   {
+      clientID: partnerID/groupID/deviceID
+      type: message_type
+      body: [testId_string, testId_string]
+   }
+
+   """
+   clientID= partnerID+"/"+groupID+"/"+deviceID 
+   message= {"clientID" : clientID, "type": message_type, "body": body}
+   return json.dumps(message)
+
 
 def prepare_testIDs():
    """Function that collects and formats all the testId's used that day 
-   and the day before to send to the server. Message will be in the 
-   form: "clientID\nTESTIDS\nid1\nid2\nid3\nid4"
+   and the day before to send to the server. Message formatted in JSON. 
+
+   Returns: 
+      (JSON) JSON object of testId's
    """
-   message= clientID+"\n"
-   message+= "TESTIDS\n"  
+   message_body= []
+
    today= open(clientPath+"todays_testIDs.log", 'r')
-   for line in today: 
-      message+=line
+   yesterday= open(clientPath+"yesterdays_testIDs.log", 'r')
+  
+   for log_file in [today, yesterday]:
+      for line in log_file: 
+         if "/" not in line: 
+            print len(line)
+            message_body.append(line[:-1])
+      log_file.close()
 
-   yesterday= today= open(clientPath+"yesterdays_testIDs.log", 'r')
-   for line in yesterday:
-      message+=line
-
-   return message
-
+   return create_JSON_message("testId", message_body)
 
 ##############################################   Socket code #############################################################
 
@@ -143,9 +211,8 @@ def talk_to_server(message):
    Args: 
       message: (string)
    
-   Only two types of messages should be sent. 1. A client ID
-   to ask for a schedule or 2. a string of all test ID's to 
-   be saved by the governor server. 
+   Only two types of messages should be sent. 1. schedule request or 
+   2. report of test ID's to be saved by the governor server. 
 
    Only three types of messages can be received. 1. a schedule
    2. ack indicating the test ID's were received 3. "Failed" 
@@ -164,30 +231,33 @@ def talk_to_server(message):
    try :
        s.sendall(message)
    except socket.error:
-       print 'Send failed'
+       print 'Send failed.'
        sys.exit()
 
    reply = s.recv(4096)
+   reply= json.loads(reply)
+
    print "Completed communication."
    print "Server reply: "+str(reply)
    
 
    #if got a schedule
-   if "/" in reply: 
-      reply= process_reply(reply)
+   if reply["type"]=="schedule": 
+      reply["body"]= process_reply(reply["body"])
       print "Successfully received new schedule."
 
    #ack received after saving ids
-   elif reply=="ack": 
+   elif reply["type"]=="ack": 
       log_data("TestIDs successfully saved on server.")
       print "Test Id's successfully saved on server."
 
    #some failure
-   elif reply=="Failed.": 
-      log_data("Communication with server failed: "+message)
+   elif reply["type"]=="failed": 
+      log_data("\nERROR: Communication with server failed.\n")
       print "ERROR: Could not communicate with server."
 
-   
+   print "Reply type: "+str(type(reply))
+
    s.close()
    return reply
 
@@ -201,17 +271,7 @@ def send_testIDs():
    start_new_testLog()
    talk_to_server(new_message)
 
-
-config.read(configFile) 
-#clientPath= config.get("Addresses", "client_path")
-server_address=config.get("Addresses", "server_address")
-deviceID= config.get("Addresses", "deviceID")
-#clientID= "partnerID/groupID/deviceID"
-clientID= config.get("Addresses", "partnerID")+"/"+config.get("Addresses", "groupID")+"/"+deviceID
-port = 8888
-
-
-######################################################################################################################
+##################################################################################################
 
 if __name__ == '__main__':
    
@@ -223,21 +283,21 @@ if __name__ == '__main__':
       if governor.empty(): 
          
          #ask for a new schedule
-         message = str(clientID)
+         message = create_JSON_message('schedule')
          new_sched= talk_to_server(message)
          
          #if received new schedule
-         if type(new_sched)==list: 
-            scheduleTests(new_sched)
+         if new_sched["type"]=='schedule': 
+            scheduleTests(new_sched["body"])
             print "New tests scheduled."
             governor.run()
 
      
-      #if almost midnight, send ids
-      now= time.localtime()
-      midnight= time.strptime(str(now.tm_mon)+"/"+str(now.tm_mday)+"/"+str(now.tm_year)+","+ "23,59,00",  '%m/%d/%Y,%H,%M,%S')
-      if now>midnight: 
-         send_testIDs()
+      # #if almost midnight, send ids
+      # now= time.localtime()
+      # midnight= time.strptime(str(now.tm_mon)+"/"+str(now.tm_mday)+"/"+str(now.tm_year)+","+ "17,16,00",  '%m/%d/%Y,%H,%M,%S')
+      # if now>midnight: 
+      #    #send_testIDs()
 
 
 
